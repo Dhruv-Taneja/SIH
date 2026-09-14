@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DocuVerify — Smart Document Verification</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <div class="logo">🛡️ DocuVerify</div>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#verify">Verify</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#supported">Documents</a>
+    </nav>
+    <span class="badge">College Project • Runs Locally</span>
+    <span id="accountBar" class="badge hidden"></span>
+  </div>
+</header>
+
+<section id="auth" class="section">
+  <div class="panel auth-panel">
+    <div id="authSignedOut">
+      <h2>Organization sign in <small class="muted">(optional)</small></h2>
+      <p class="muted">Anyone can verify documents below without an account. Organizations verifying people at scale can sign in or create an account instead — everything stays on this machine.</p>
+      <div class="tabs">
+        <button id="tabSignin" class="tab active" type="button">Sign in</button>
+        <button id="tabSignup" class="tab" type="button">Sign up</button>
+      </div>
+      <form id="signinForm" class="auth-form">
+        <input id="signinEmail" type="email" placeholder="Organization email" required autocomplete="email" />
+        <input id="signinPass" type="password" placeholder="Password" required autocomplete="current-password" />
+        <button class="btn primary full" type="submit">Sign in</button>
+      </form>
+      <form id="signupForm" class="auth-form hidden">
+        <input id="signupOrg" type="text" placeholder="Organization name" required autocomplete="organization" />
+        <input id="signupEmail" type="email" placeholder="Organization email" required autocomplete="email" />
+        <input id="signupPass" type="password" placeholder="Password (min 8 characters)" required minlength="8" autocomplete="new-password" />
+        <button class="btn primary full" type="submit">Create account</button>
+      </form>
+      <div id="authStatus" class="status"></div>
+    </div>
+    <div id="authSignedIn" class="hidden">
+      <h2 id="welcomeMsg">Welcome</h2>
+      <p class="muted">You're signed in. Upload documents below to verify people.</p>
+      <button id="signoutBtn" class="btn ghost" type="button">Sign out</button>
+    </div>
+  </div>
+</section>
+
+<section class="hero">
+  <div class="hero-text">
+    <h1>Submit a document.<br/>Get it <span class="accent">verified</span> in seconds.</h1>
+    <p>Upload a photo / PDF or scan with your camera. Our pipeline runs
+       <strong>PaddleOCR</strong> for text extraction, then checks the
+       <strong>syntax</strong> (formats, regex, checksums) and the
+       <strong>semantics</strong> (template match, entity completeness, date logic, coherence).</p>
+    <div class="hero-cta">
+      <a href="#verify" class="btn primary">Verify a document →</a>
+      <a href="#how" class="btn ghost">See how it works</a>
+    </div>
+    <div class="stats">
+      <div><strong>5</strong><span>doc types</span></div>
+      <div><strong>3-stage</strong><span>OCR → syntax → semantics</span></div>
+      <div><strong>100%</strong><span>local, no cloud</span></div>
+    </div>
+  </div>
+  <div class="hero-card">
+    <div class="card-head">● ● ● &nbsp; live verification</div>
+    <div class="card-body">
+      <div class="verdict-demo verified">✔ VERIFIED <small>Aadhaar • 0.87</small></div>
+      <div class="bar"><label>OCR confidence</label><div class="track"><div class="fill" style="width:92%"></div></div><b>0.92</b></div>
+      <div class="bar"><label>Syntax score</label><div class="track"><div class="fill" style="width:85%"></div></div><b>0.85</b></div>
+      <div class="bar"><label>Semantic score</label><div class="track"><div class="fill" style="width:81%"></div></div><b>0.81</b></div>
+      <code>Aadhaar No: 2345 6789 0123 ✓<br/>DOB: 14/08/1999 ✓ &nbsp; Gender: MALE ✓</code>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="section">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Submit</h3><p>Upload JPG / PNG / PDF or capture a live scan with your camera.</p></div>
+    <div class="step"><div class="n">2</div><h3>OCR (PaddleOCR)</h3><p>OpenCV preprocessing (denoise + threshold + upscale), then PaddleOCR extracts text with per-line confidence.</p></div>
+    <div class="step"><div class="n">3</div><h3>Syntax check</h3><p>Regex + format rules: Aadhaar 12-digit + Verhoeff checksum, PAN ABCDE1234F, passport, dates, PIN codes…</p></div>
+    <div class="step"><div class="n">4</div><h3>Semantic check</h3><p>TF-IDF template similarity (scikit-learn), entity completeness, date logic, coherence scoring → verdict.</p></div>
+  </div>
+</section>
+
+<section id="verify" class="section verify">
+  <h2>Verify your document</h2>
+  <p class="muted">Files stay on your machine — backend is Node.js + Express, ML runs in local Python.</p>
+
+  <div class="verify-grid">
+    <div class="panel">
+      <label>Document type</label>
+      <select id="docType">
+        <option value="auto" selected>Auto-detect (recommended)</option>
+        <option value="aadhaar">Aadhaar Card</option>
+        <option value="pan">PAN Card</option>
+        <option value="passport">Passport</option>
+        <option value="driving_licence">Driving Licence</option>
+        <option value="marksheet">Marksheet</option>
+        <option value="certificate">Certificate</option>
+        <option value="generic">Generic / Other</option>
+      </select>
+
+      <div id="dropzone" class="dropzone">
+        <div class="dz-icon">📄</div>
+        <p><strong>Drag & drop</strong> your file here, or <button type="button" id="browseBtn" class="link">browse</button></p>
+        <small>JPG, PNG or PDF • max 10 MB</small>
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.pdf" hidden />
+      </div>
+
+      <div class="or">— or —</div>
+
+      <button id="scanBtn" class="btn primary full">📷 Scan with camera</button>
+      <div id="cameraBox" class="camera hidden">
+        <video id="video" autoplay playsinline></video>
+        <div class="cam-row">
+          <button id="captureBtn" class="btn primary">Capture</button>
+          <button id="closeCamBtn" class="btn ghost">Close</button>
+        </div>
+        <canvas id="canvas" hidden></canvas>
+      </div>
+
+      <div id="previewBox" class="preview hidden">
+        <img id="previewImg" alt="preview" />
+        <div class="preview-meta"><span id="fileName"></span><button id="clearBtn" class="link">remove</button></div>
+      </div>
+
+      <button id="verifyBtn" class="btn primary full big" disabled>Verify document</button>
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="panel results" id="resultsPanel">
+      <div id="emptyResult" class="empty">Results will appear here after verification.<br/><br/>Decisions: <b class="v-ok">VERIFIED</b> • <b class="v-warn">NEEDS_REVIEW</b> • <b class="v-bad">SUSPICIOUS</b><br/><small>"Cannot verify" is not "fake" — see reasons.</small></div>
+      <div id="resultContent" class="hidden">
+        <div id="verdictBadge" class="verdict"></div>
+        <div id="reasonsBox" class="reasons"></div>
+        <div class="ev-grid">
+          <div class="ev"><h5>Document type</h5><p id="evType"></p></div>
+          <div class="ev"><h5>Image quality</h5><p id="evQuality"></p></div>
+          <div class="ev"><h5>OCR</h5><p id="evOcr"></p></div>
+          <div class="ev"><h5>Structure</h5><p id="evStruct"></p></div>
+          <div class="ev"><h5>Cross-field</h5><p id="evCross"></p></div>
+          <div class="ev"><h5>QR / Tamper screen</h5><p id="evTamper"></p></div>
+        </div>
+        <div class="scores">
+          <div class="bar"><label>Overall</label><div class="track"><div id="sOverall" class="fill"></div></div><b id="sOverallV"></b></div>
+          <div class="bar"><label>OCR</label><div class="track"><div id="sOcr" class="fill"></div></div><b id="sOcrV"></b></div>
+          <div class="bar"><label>Syntax</label><div class="track"><div id="sSyn" class="fill"></div></div><b id="sSynV"></b></div>
+          <div class="bar"><label>Semantic</label><div class="track"><div id="sSem" class="fill"></div></div><b id="sSemV"></b></div>
+        </div>
+        <p class="engine muted">Engine: <span id="engine"></span></p>
+        <h4>Checks</h4>
+        <ul id="checksList" class="checks"></ul>
+        <h4>Extracted text (OCR)</h4>
+        <pre id="ocrText"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dashboard" class="section">
+  <h2>Dashboard</h2>
+  <p class="muted">Session analytics from your verifications — stored only in this browser, nothing leaves your machine.</p>
+  <div class="dash-cards">
+    <div class="dash-card"><span class="dc-num" id="stTotal">0</span><span class="dc-label">Verifications</span></div>
+    <div class="dash-card ok"><span class="dc-num" id="stVerified">0</span><span class="dc-label">Verified</span></div>
+    <div class="dash-card warn"><span class="dc-num" id="stReview">0</span><span class="dc-label">Needs review</span></div>
+    <div class="dash-card bad"><span class="dc-num" id="stSuspicious">0</span><span class="dc-label">Suspicious</span></div>
+    <div class="dash-card"><span class="dc-num" id="stAvg">—</span><span class="dc-label">Avg. score</span></div>
+  </div>
+  <div class="dash-grid">
+    <div class="panel">
+      <h4>Decisions</h4>
+      <div class="donut-wrap">
+        <div class="donut" id="donut"></div>
+        <ul class="legend" id="donutLegend"></ul>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>By document type</h4>
+      <div id="typeBars" class="type-bars"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="hist-head">
+      <h4>Recent verifications</h4>
+      <button id="clearHistBtn" class="btn ghost small">Clear history</button>
+    </div>
+    <div class="table-wrap">
+      <table class="hist">
+        <thead><tr><th>Time</th><th>Document</th><th>Decision</th><th>Score</th><th>OCR</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+      <p id="histEmpty" class="muted">No verifications yet — verify a document above and it will appear here.</p>
+    </div>
+  </div>
+</section>
+
+<section id="supported" class="section">
+  <h2>Supported documents</h2>
+  <div class="docs">
+    <div class="doc"><h3>🪪 Aadhaar</h3><p>12-digit number + Verhoeff checksum, DOB, gender, PIN</p></div>
+    <div class="doc"><h3>💳 PAN</h3><p>ABCDE1234F format, holder-type letter, DOB</p></div>
+    <div class="doc"><h3>🛂 Passport</h3><p>Passport no., MRZ lines, nationality, issue/expiry dates</p></div>
+    <div class="doc"><h3>🎓 Marksheet</h3><p>Roll / registration no., year, marks, percentage</p></div>
+    <div class="doc"><h3>📁 Generic</h3><p>Email, phone, dates, PIN — coherence + template scoring</p></div>
+  </div>
+</section>
+
+<footer>
+  <p>DocuVerify • SIH / college project • Backend: Node.js + Express • ML: PaddleOCR + OpenCV + scikit-learn • <strong>Local demo only — not deployed.</strong></p>
+</footer>
+
+<script src="app.js"></script>
+<script src="dashboard.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>

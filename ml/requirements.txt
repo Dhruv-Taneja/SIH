@@ -1,0 +1,14 @@
+paddlepaddle==3.1.0
+paddleocr==2.7.3
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+PyMuPDF>=1.23.0
+scikit-learn>=1.3.0
+# Lightweight fallbacks (digital PDFs / image OCR without Paddle):
+pypdf>=4.0.0
+pytesseract>=0.3.10
+# Easiest photo-OCR option (pip only, no system binary, ~15MB):
+rapidocr-onnxruntime>=1.2.0
+# NOTE: pytesseract also needs the tesseract binary:
+#   macOS: brew install tesseract | Ubuntu: sudo apt install tesseract-ocr
