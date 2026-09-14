@@ -5,14 +5,16 @@ is unavailable (digital PDFs still work via pypdf/PyMuPDF).
 
 Usage: python3 ml/check_engines.py   → prints single JSON line.
 """
+import importlib.util
 import json
 import shutil
 
 
 def _try_import(name):
+    # Check availability WITHOUT importing: real imports of cv2 /
+    # onnxruntime / sklearn load 300MB+ and OOM small servers.
     try:
-        __import__(name)
-        return True
+        return importlib.util.find_spec(name) is not None
     except Exception:
         return False
 
