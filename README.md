@@ -1,166 +1,113 @@
-# 🛡️ DocuVerify — Document Verification (College Project, Local Only)
+# DocuVerify - Document Verification System
 
-Upload / scan a document → **PaddleOCR** extracts text → **syntax checks** (regex, formats, Verhoeff checksum) → **semantic checks** (TF-IDF template match, entity completeness, date logic, coherence) → verdict: `VERIFIED` / `NEEDS_REVIEW` / `REJECTED`.
+A web app to verify Indian documents like Aadhaar, PAN, Passport, Driving Licence, Marksheets and Certificates. Upload a scan or photo and it extracts the text using OCR and checks whether the details look valid.
 
-> ⚠️ **Do not deploy.** Local demo only.
+Built for Smart India Hackathon (SIH).
 
-## Architecture (layered pipeline)
+## Features
 
-```
-Browser (public/) — upload / camera scan / evidence UI
-   │  POST /api/upload (multipart: document + documentType)
-   ▼
-Node.js + Express (server.js) — limits, temp files, python-shell bridge
-   │  python3 ml/verify_document.py <file> <type>
-   ▼
-Python pipeline (ml/):
-  1. OCR (image_quality-gated): OpenCV preprocess → PaddleOCR → RapidOCR → Tesseract (best read wins).
-     Orientation-invariant: EXIF honored, deskewed, 0/90/180/270° tried with
-     coherence voting + early exit (upright stays at one pass per engine).
-  2. ImageQualityChecker (image_quality.py): resolution/blur/brightness/contrast/glare.
-     Poor image ⇒ NEEDS_REVIEW ("insufficient quality") — NEVER fraud evidence.
-  3. DocumentClassifier (classifier.py): corpus-fit TF-IDF → softmax probabilities
-     over types + confidence. Uncertain ⇒ NEEDS_REVIEW, never forced.
-  4. Verifier adapters (verifiers.py + doc_templates.py): Aadhaar/PAN/Passport/
-     Marksheet/Certificate/Generic share one interface — add types without rewrites.
-  5. CrossFieldValidator (cross_field.py): repeated facts must agree; ICAO 9303
-     MRZ check digits (real math, no API); marksheet arithmetic (total=sum, % check).
-  6. TamperAnalyzer (tamper.py): QR detected≠readable≠authentic; ELA + noise screens.
-     Signals only — never proof of forgery.
-  7. EvidenceAggregator + DecisionEngine (evidence.py, config in
-     ml/config/documentVerification.json): weighted evidence per doc type →
-     VERIFIED (strong evidence, no contradiction) / NEEDS_REVIEW (cannot verify)
-     / SUSPICIOUS (contradictions on a readable document).
-```
+- Upload document image (JPG, PNG) or PDF, or scan directly with camera
+- Automatic text extraction with OCR
+- Format and checksum validation (Aadhaar Verhoeff check, PAN format, passport MRZ check digits, marksheet total/percentage check)
+- Document type detection
+- Clear result: Verified, Needs Review or Rejected with score and reasons
+- Shows extracted text and individual checks
+- Organization login to keep track of verifications
 
-Product principle: **"AI-assisted document screening"** — the system communicates
-uncertainty. "Cannot verify" is NOT "fake". Cryptographic authenticity is reported
-as `NOT_AVAILABLE` ("not established") unless an official validator is configured;
-a valid format (e.g. PAN) is never presented as genuine.
+## Tech Stack
 
-## Supported documents
+- Frontend: HTML, CSS, JavaScript
+- Backend: Node.js + Express
+- ML Pipeline: Python, PaddleOCR, RapidOCR, OpenCV, scikit-learn
+- File handling: Multer
 
-| Type | Structure | Cross-field emphasis |
-|---|---|---|
-| Aadhaar | 12-digit + Verhoeff (+1-digit OCR self-heal), DOB (OCR-tolerant label), gender, PIN | repeated numbers must agree |
-| PAN | ABCDE1234F, holder-type letter, DOB | repeated numbers must agree |
-| Passport | Passport no., MRZ, nationality | OCR vs MRZ + ICAO check digits |
-| Driving Licence | DL no. (SS RR YYYY serial), DOB, validity, issue date | repeated numbers must agree; validity-after-DOB |
-| Marksheet | Roll no. (label-tolerant), year, marks/grades | total=sum, percentage math |
-| Certificate | Cert ID, recipient, date, course | date/field consistency |
-| Generic | Found-pattern evidence only (no absent-field noise) | light checks |
+## Supported Documents
 
-## Run locally
+- Aadhaar Card
+- PAN Card
+- Passport
+- Driving Licence
+- Marksheet
+- Certificate
+- Generic documents
 
-**1. Backend deps**
+## How to Run
+
+1. Install backend dependencies:
+
 ```bash
 npm install
 ```
 
-**2. Python ML deps** (Python 3.9+; first run downloads PaddleOCR models ~100MB)
+2. Install Python dependencies (Python 3.9+ required):
+
 ```bash
 pip install -r ml/requirements.txt
 ```
 
-**3. Start**
+3. Start the server:
+
 ```bash
 npm start
-# open http://localhost:3000
 ```
 
-Health check: `http://localhost:3000/api/health`
+Open http://localhost:3000 in your browser.
 
-## Organization accounts (local only, optional)
+Health check: http://localhost:3000/api/health
 
-- Anyone can verify without an account. Organizations may sign up / sign in
-  from the **Organization sign in** panel; uploads are then logged under the org name.
-- Credentials: scrypt-hashed, stored in `data/users.json`; sessions are opaque
-  HttpOnly cookies (`data/sessions.json`, 7-day expiry). Nothing leaves this machine.
-- Demo-grade auth for a college project — do not reuse these patterns for production.
+## How to Use
 
-## Try it (no account needed)
+1. Select the document type.
+2. Upload a file or scan with camera.
+3. Click Verify Document to see the result, scores and extracted text.
 
-1. Pick document type (e.g. Aadhaar).
-2. Drag-drop a JPG/PNG/PDF **or** click *Scan with camera* → Capture.
-3. Hit **Verify document** → see verdict, score bars, per-check list, OCR text.
+Note: The first OCR run takes time because it downloads the models. For best results use a clear, well-lit photo.
 
-> Tip: first OCR run is slow (model download). Blurry photos → `NEEDS_REVIEW` with a "retake photo" hint. That's the coherence check working.
+## Organization Login
 
-## For your project report / viva
+Organizations can sign up and sign in from the sign in panel. Verifications done while signed in are tagged with the organization name. Guest verification works without login.
 
-- **OCR:** PaddleOCR (`use_angle_cls=True`), OpenCV preprocessing in `preprocess_image()`.
-- **Syntax:** regexes in `TEMPLATES` + `syntax_checks()` + Verhoeff checksum for Aadhaar.
-- **Semantics:** `semantic_checks()` — TF-IDF cosine similarity vs template, entity completeness (name/id/date), future-date detection, alpha-ratio coherence.
-- **Scoring:** `overall = 0.35·OCR + 0.35·syntax + 0.30·semantic`; ≥0.70 + OCR≥0.50 → VERIFIED; ≥0.40 → NEEDS_REVIEW; else REJECTED.
-- **JS↔Python:** `python-shell` v5 Promise API in `processDocument()`.
+Accounts are stored locally in `data/users.json` with hashed passwords.
 
-## Files
+## Project Structure
 
 ```
-server.js              Express + multer + python-shell bridge
-public/                Landing + verify UI with evidence sections
-ml/verify_document.py  Pipeline entry (OCR, orchestration, legacy compat)
-ml/doc_templates.py    Single source of patterns/keywords (no duplication)
-ml/classifier.py       Probabilistic document classifier
-ml/verifiers.py        Adapter per doc type (common interface)
-ml/cross_field.py      Cross-field validator + ICAO MRZ math
-ml/tamper.py           QR + ELA + noise screens (signals, not proof)
-ml/evidence.py         Aggregator + decision engine
-ml/image_quality.py    Independent quality gate
-ml/check_engines.py    Engine availability probe (/api/health)
-ml/config/documentVerification.json   Thresholds + weights (calibrate here)
-tests/test_pipeline.py Unit tests — synthetic data only, no real IDs
-sample/                Synthetic demo docs (fictional data)
-uploads/               Temp uploads (auto-created, auto-cleaned, never stored)
+server.js              Express server and upload handling
+public/                Frontend (index, styles, app logic)
+ml/verify_document.py  Main verification pipeline
+ml/doc_templates.py    Document patterns and keywords
+ml/classifier.py       Document type classifier
+ml/verifiers.py        Checks for each document type
+ml/cross_field.py      Cross field validation and MRZ checks
+ml/tamper.py           Tamper and quality signals
+ml/evidence.py         Final scoring and decision
+ml/image_quality.py    Image quality check
+ml/check_engines.py    OCR engine status check
+ml/config/documentVerification.json   Thresholds and weights
+tests/test_pipeline.py Unit tests
+sample/                Sample documents for testing
+uploads/               Temporary uploads (auto deleted)
 ```
 
-## Tests + threshold calibration
+## Testing
 
 ```bash
-python3 -m unittest discover -s tests -v   # 15 tests: checksum self-heal, MRZ,
-                                           # arithmetic, classifier, quality, decisions
+python3 -m unittest discover -s tests -v
 ```
 
-Thresholds/weights live in `ml/config/documentVerification.json` (documented
-there). Calibrate on a labeled validation set (genuine / blurry / rotated /
-altered-field / inconsistent-field cases, all synthetic) and report precision,
-recall, F1 per doc type — not accuracy alone.
+## Notes
 
-## Privacy (identity documents stay local)
-
-- 100% local processing; uploads are never sent anywhere.
-- Temp files deleted after every request; nothing is stored, no document DB.
-- Server logs filenames only — never extracted text/numbers.
-- 10 MB limit, image/PDF-only filter, UUID filenames (no path traversal).
-- Python runs isolated per request; malformed files fail safe with JSON errors.
-
-## Troubleshooting
-
-**"OCR could not read any text (ocr-unavailable…)" on JPG/PNG photos?**
-Photos need an OCR engine; digital PDFs don't (they carry a text layer).
-This project tries engines in order — PaddleOCR → RapidOCR → Tesseract —
-and keeps the best read. Install any ONE (easiest first):
+- Uploaded files are temporary and deleted after verification.
+- Max file size is 10 MB. Only images and PDFs allowed.
+- If photo OCR does not work, install an OCR engine:
 
 ```bash
-# Option A — easiest, pip only, no system packages:
 pip install rapidocr-onnxruntime
-
-# Option B — classic Tesseract (macOS):
-brew install tesseract && pip install pytesseract
-
-# Option C — full PaddleOCR (biggest download, ~500MB):
-pip install -r ml/requirements.txt
 ```
 
-Check what's installed: open `http://localhost:3000/api/health` and look at
-`engines.image_ocr_ready` (must be `true` for photos) and `engines.pdf_text_ready`.
-The web UI also shows a warning banner on load when photo OCR is missing.
+or
 
-**For the sharpest scans:** hold the phone parallel to the page, fill the frame,
-use daylight/white light (no yellow bulb + no shadow), wipe the camera lens.
-The app deskews, denoises and auto-corrects spelling, but a blurry photo still
-caps your score — garbage in, NEEDS_REVIEW out.
-
-- `ML service failed…` → you skipped `npm install`, or `python3` isn't on PATH.
-- Blurry/dark photos → `NEEDS_REVIEW` with a "retake photo" hint (coherence check working).
-- Camera button fails → open via `http://localhost:3000` (not `file://`), allow camera permission, use Chrome/Edge.
+```bash
+brew install tesseract
+pip install pytesseract
+```
